@@ -1,0 +1,96 @@
+calltrace is a gdb plugin to track flow of function calls and returns in a style similar to DTrace flowindent, but with an output that can be manipulated using (emacs) orgmode. It requires gdb with python2.
+
+USAGE
+> gdb -ex 'python execfile("<path/to/calltrace.py>")' <path/to/executable>
+
+to save output to a file
+(gdb) > calltrace log <path/to/logfile.org>
+
+to tell calltrace not to print return addresses
+(gdb) > calltrace minimal
+
+to execute
+(gdb) > r <your arguments>
+OR
+(gdb) > calltrace
+
+Results are printed in a way so they can be easily manipulated via emacs orgmode.
+
+
+EXAMPLE
+
+Suppose you have build an executable called hello from the following source:
+"""
+#include <stdio.h>
+
+void say_hello() {
+  printf("hello, world!\n");
+}
+
+int main() {
+  say_hello();
+  return 0;
+}
+"""
+
+You can then get the call trace via:
+> gdb -ex 'python execfile("path/to/calltrace.py")' hello
+GNU gdb 7.11.1
+Copyright (C) 2016 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+and "show warranty" for details.
+This GDB was configured as "x86_64-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<http://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+<http://www.gnu.org/software/gdb/documentation/>.
+For help, type "help".
+Type "apropos word" to search for commands related to "word"...
+Reading symbols from hello...(no debugging symbols found)...done.
+found FUNC deregister_tm_clones at 0000000000400460
+found FUNC register_tm_clones at 00000000004004a0
+found FUNC __do_global_dtors_aux at 00000000004004e0
+found FUNC frame_dummy at 0000000000400500
+found FUNC __libc_csu_fini at 00000000004005c0
+found FUNC _fini at 00000000004005c4
+found FUNC __libc_csu_init at 0000000000400550
+found FUNC _start at 0000000000400430
+found FUNC main at 0000000000400537
+found FUNC say_hello at 0000000000400526
+found FUNC _init at 00000000004003c8
+(gdb) calltrace log out.org
+setting log to out.org
+(gdb) r
+Starting program: hello
+Cannot set FinishBreakpoint for _start
+Cannot set FinishBreakpoint for main
+hello, world!
+[Inferior 1 (process 1915) exited normally]
+Execution finished, exit code 0.
+results written to out.org
+(gdb) q
+> cat out.org # out.org contains:
+* > _init
+* < _init@0x7ffff7de74aa
+* > _start
+** > __libc_csu_init
+*** > _init
+*** < _init@0x400581
+*** > frame_dummy
+**** > register_tm_clones
+**** < frame_dummy@0x40059d
+*** < register_tm_clones@0x40059d
+** < __libc_csu_init@0x7ffff7a2e7bf
+** > main
+*** > say_hello
+*** < say_hello@0x400545
+*** > __do_global_dtors_aux
+**** > deregister_tm_clones
+**** < deregister_tm_clones@0x4004f2
+*** < __do_global_dtors_aux@0x7ffff7de7c17
+*** > _fini
+*** < _fini@0x7ffff7de7c35
+
