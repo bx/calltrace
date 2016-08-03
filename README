@@ -1,18 +1,22 @@
 calltrace is a gdb plugin to track flow of function calls and returns in a style similar to DTrace flowindent, but with an output that can be manipulated using (emacs) orgmode. It requires gdb with python2, and an unstripped executable (with symbol information).
 
+
 USAGE
 > gdb -ex 'python execfile("<path/to/calltrace.py>")' <path/to/executable>
 
-to save output to a file
-(gdb) > calltrace log <path/to/logfile.org>
+to save output to a file:
+(gdb) calltrace log <path/to/logfile.org>
 
-to tell calltrace not to print return addresses
-(gdb) > calltrace minimal
+to tell calltrace to print source code path/line number information:
+(gdb) calltrace sourceinfo
 
-to execute
-(gdb) > r <your arguments>
+to tell calltrace not to print return addresses or source code information
+(gdb) calltrace minimal
+
+to execute:
+(gdb) r <your arguments>
 OR
-(gdb) > calltrace
+(gdb) calltrace
 
 Results are printed in a way so they can be easily manipulated via emacs orgmode.
 

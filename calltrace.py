@@ -24,7 +24,19 @@ import gdb
 import subprocess
 import re
 
-def get_c_function_names(elf, verbose=False):    
+
+def addr2line(elf, addr, verbose=False):
+    cmd = "addr2line -e %s 0x%x 2>/dev/null" % (elf, addr)
+    if verbose:
+        print "executing: '%s'" % cmd
+    output = subprocess.check_output(cmd, shell=True)
+    if verbose:
+        print output
+    # format output so it's orgmode friendly, replace ":" with "::"
+    return re.sub(":", "::", output.split()[0])
+
+
+def get_c_function_names(elf, verbose=False):
     cmd = 'readelf -W -s %s 2>/dev/null' % elf
     if verbose:
         print "executing: '%s'" % cmd
@@ -38,7 +50,7 @@ def get_c_function_names(elf, verbose=False):
         if m is not None:
             (addr, name, t) = (m.groupdict()['addr'], m.groupdict()['name'], m.groupdict()['t'])
             if t == "FUNC":
-                print "found FUNC %s at %s" % (name, addr)
+                # print "found FUNC %s at %s" % (name, addr)
                 results.append((name, int(addr, 16)))
     return results
 
@@ -51,7 +63,7 @@ class EntryBreak(gdb.Breakpoint):
         self.entered = False
 
     def stop(self):
-        if not self.entered: # ignore recursive calls
+        if not self.entered:  # ignore recursive calls
             self.ct.entry_append(self.name)
             try:
                 ExitBreak(self.name, self.ct, self)
@@ -69,15 +81,12 @@ class ExitBreak(gdb.FinishBreakpoint):
         self.ct = ct
         self.entry = entry
 
-    def pc(self):
-        return int(gdb.execute("print/x $pc", to_string=True).split()[2], 16)
-
     def out_of_scope(self):
         self.entry.entered = False
         print "exit breakpoint for %s out of scope" % self.name
 
     def stop(self):
-        self.ct.exit_append(self.name, self.pc())
+        self.ct.exit_append(self.name)
         self.entry.entered = False
         return False
 
@@ -89,29 +98,43 @@ class CallTrace(gdb.Command):
         self.log = False
         gdb.execute('set python print-stack full')
         gdb.execute('set pagination off')
-        gdb.execute('set height unlimited')        
+        gdb.execute('set height unlimited')
         gdb.Command.__init__(self, "calltrace", gdb.COMMAND_DATA)
         self.quiet = False
         self.minimal = False
+        self.sourceinfo = False
         self.setup_breakpoints()
         self.setup_exit_handler()
 
     def setup_exit_handler(self):
         gdb.events.exited.connect(self.finish)
-        
+
     def entry_append(self, name):
-        self.results.append((self.depth, name,  "entry", ("*" * (self.depth + 1)) + " > " + name))
+        addr = self.pc()
+        outstr = ("*" * (self.depth + 1)) + " > " + name
+        if self.sourceinfo:
+            outstr += " [[%s]]" % addr2line(self.elf, addr)
+        self.results.append((self.depth, name,  "entry", outstr))
         self.depth += 1
 
-    def exit_append(self, name, addr):
+    def pc(self):
+        return int(gdb.execute("print/x $pc", to_string=True).split()[2], 16)
+
+    def exit_append(self, name):
+        addr = self.pc()
         self.depth -= 1
         outstr = ("*" * (self.depth + 1)) + " < " + name
         if not self.minimal:
-            outstr +=  "@0x%x" % addr
+            outstr += "@0x%x" % addr
+        if self.sourceinfo:
+            outstr += " [[%s]]" % addr2line(self.elf, addr)
         self.results.append((self.depth, name,  "exit", outstr))
-        
+
     def finish(self, event):
-        print "Execution finished, exit code %d." % event.exit_code
+        try:
+            print "Execution finished, exit code %d." % event.exit_code
+        except Exception:
+            print "Execution finished"
         if self.log:
             f = open(self.log, "w")
         for (depth, name, kind, string) in self.results:
@@ -127,10 +150,15 @@ class CallTrace(gdb.Command):
         if len(args) == 1:
             if args[0] == "minimal":
                 self.minimal = True
+                self.sourceinfo = False
             if args[0] == "nominimal":
                 self.minimal = False
             if args[0] == "log":
                 self.log = False
+            if args[0] == "sourceinfo":
+                self.sourceinfo = True
+            if args[0] == "nosourceinfo":
+                self.sourceinfo = False
         elif len(args) == 2:
             if args[0] == "log":
                 print "setting log to %s" % args[1]
@@ -138,12 +166,12 @@ class CallTrace(gdb.Command):
         elif len(args) == 0:
             gdb.execute("r")
 
-
     def setup_breakpoints(self):
         self.elf = gdb.current_progspace().filename
+        print "Searching symbol table for functions, this may take a while..."
         functions = get_c_function_names(self.elf)
         for (name, addr) in functions:
             EntryBreak(name, self)
-
+        print "...done."
 
 ct = CallTrace()
