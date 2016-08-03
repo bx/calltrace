@@ -1,4 +1,4 @@
-calltrace is a gdb plugin to track flow of function calls and returns in a style similar to DTrace flowindent, but with an output that can be manipulated using (emacs) orgmode. It requires gdb with python2.
+calltrace is a gdb plugin to track flow of function calls and returns in a style similar to DTrace flowindent, but with an output that can be manipulated using (emacs) orgmode. It requires gdb with python2, and an unstripped executable (with symbol information).
 
 USAGE
 > gdb -ex 'python execfile("<path/to/calltrace.py>")' <path/to/executable>
