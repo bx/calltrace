@@ -55,6 +55,21 @@ def get_c_function_names(elf, verbose=False):
     return results
 
 
+class PrintEvent():
+    def __init__(self, depth, name, kind, string, log):
+        self.depth = depth
+        self.name = name
+        self.kind = kind
+        self.string = string
+        self.log = log
+
+    def __call__(self):
+        if self.log:
+            self.log.write(self.string + "\n")
+        else:
+            gdb.write(self.string, gdb.STDOUT)
+
+
 class EntryBreak(gdb.Breakpoint):
     def __init__(self, name, ct):
         gdb.Breakpoint.__init__(self, name, internal=True)
@@ -114,7 +129,7 @@ class CallTrace(gdb.Command):
         outstr = ("*" * (self.depth + 1)) + " > " + name
         if self.sourceinfo:
             outstr += " [[%s]]" % addr2line(self.elf, addr)
-        self.results.append((self.depth, name,  "entry", outstr))
+        gdb.post_event(PrintEvent(self.depth, name,  "entry", outstr, self.log))
         self.depth += 1
 
     def pc(self):
@@ -128,7 +143,7 @@ class CallTrace(gdb.Command):
             outstr += "@0x%x" % addr
         if self.sourceinfo:
             outstr += " [[%s]]" % addr2line(self.elf, addr)
-        self.results.append((self.depth, name,  "exit", outstr))
+        gdb.post_event(PrintEvent(self.depth, name,  "exit", outstr, self.log))
 
     def finish(self, event):
         try:
@@ -136,14 +151,8 @@ class CallTrace(gdb.Command):
         except Exception:
             print "Execution finished"
         if self.log:
-            f = open(self.log, "w")
-        for (depth, name, kind, string) in self.results:
-            if self.log:
-                f.write(string + "\n")
-            else:
-                print string
-        if self.log:
-            print "results written to %s" % self.log
+            print "results written to %s" % self.log.name
+            self.log.close()
 
     def invoke(self, arg, from_tty):
         args = gdb.string_to_argv(arg)
@@ -162,7 +171,7 @@ class CallTrace(gdb.Command):
         elif len(args) == 2:
             if args[0] == "log":
                 print "setting log to %s" % args[1]
-                self.log = args[1]
+                self.log = open(args[1], "w")
         elif len(args) == 0:
             gdb.execute("r")
 
