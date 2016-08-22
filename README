@@ -98,3 +98,36 @@ results written to out.org
 *** > _fini
 *** < _fini@0x7ffff7de7c35
 
+
+EMACS SUPPORT
+
+You can view the script's output with any text editor, but it is best viewed with emacs org-mode and the calltrace.el elisp file loaded.
+
+calltrace.el provides functions to help you better understand the call
+trace output by hiding duplicate adjacent function calls. It does not
+(yet) check to see that the subcalls of any two matching adjacent
+function calls have the same structure, but it should not be hard to
+add that feature.
+
+To hide and merge matching adjacent function calls (note: this may take a while and emacs may appear to freeze while it is running):
+M-x ct-collapse-dups-until-none
+
+Matching adjacent function calls are marked with an ARCHIVE tag in
+order to harness org-mode's automatic hiding of subtrees of nodes
+marked with the tag ARCHIVE.  You can save the file so you don't have
+to run any tagging stripts in the future.  Emacs will not remember the
+visibility state of everything in future sessions, but you can execute
+the expression (ct-collapse-dups-until-none t) in order to instruct
+emacs to more thoroughly hide duplicate adjacent function calls.
+
+M-: (ct-collapse-dups-until-none t) [Enter]
+
+
+If you wish to remove all of the ARCHIVE tags:
+M-x (ct-remove-all-hide-tags)
+
+Hidden headlines are collapsed into a {hidden} tag. You can use the tab key to toggle visibility and C+tab to toggle visibility of ARCHIVe subtrees.
+
+These scripts try not to mess with any extra notes or annotations you have added to the file (beside ARCHIVE tags), but this claim has yet to be tested.
+
+Enjoy at your own risk!
